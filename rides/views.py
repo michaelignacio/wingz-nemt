@@ -34,8 +34,8 @@ class UserViewSet(viewsets.ModelViewSet):
     # Filtering options
     filterset_fields = ['role', 'is_active']
     search_fields = ['first_name', 'last_name', 'email', 'phone_number']
-    ordering_fields = ['id_user', 'first_name', 'last_name', 'email', 'created_at']
-    ordering = ['-created_at']  # Default ordering
+    ordering_fields = ['id_user', 'first_name', 'last_name', 'email', 'date_joined']
+    ordering = ['-date_joined']  # Default ordering
     
     def get_serializer_class(self):
         """
@@ -143,7 +143,7 @@ class UserViewSet(viewsets.ModelViewSet):
         user = self.get_object()
         rides = Ride.objects.filter(
             Q(id_rider=user) | Q(id_driver=user)
-        ).order_by('-created_at')
+        ).order_by('-pickup_time')
         
         serializer = RideListSerializer(rides, many=True)
         return Response(serializer.data)
@@ -181,10 +181,10 @@ class RideEventViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     
     # Filtering options
-    filterset_fields = ['event_type', 'id_ride', 'id_ride__status']
-    search_fields = ['event_type', 'id_ride__id_rider__email', 'id_ride__id_driver__email']
-    ordering_fields = ['id_ride_event', 'event_time', 'event_type', 'created_at']
-    ordering = ['-event_time']  # Default ordering by most recent events
+    filterset_fields = ['description', 'id_ride', 'id_ride__status']
+    search_fields = ['description', 'id_ride__id_rider__email', 'id_ride__id_driver__email']
+    ordering_fields = ['id_ride_event', 'created_at', 'description']
+    ordering = ['-created_at']  # Default ordering by most recent events
     
     def get_serializer_class(self):
         """
@@ -212,9 +212,9 @@ class RideEventViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(id_ride=ride_id)
         
         # Filter by event type if specified
-        event_type = self.request.query_params.get('event_type', None)
-        if event_type:
-            queryset = queryset.filter(event_type__icontains=event_type)
+        description = self.request.query_params.get('description', None)
+        if description:
+            queryset = queryset.filter(description__icontains=description)
         
         # Filter by date range if specified
         start_date = self.request.query_params.get('start_date', None)
@@ -224,7 +224,7 @@ class RideEventViewSet(viewsets.ModelViewSet):
             try:
                 from datetime import datetime
                 start_datetime = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-                queryset = queryset.filter(event_time__gte=start_datetime)
+                queryset = queryset.filter(created_at__gte=start_datetime)
             except ValueError:
                 pass  # Invalid date format, ignore filter
         
@@ -232,7 +232,7 @@ class RideEventViewSet(viewsets.ModelViewSet):
             try:
                 from datetime import datetime
                 end_datetime = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
-                queryset = queryset.filter(event_time__lte=end_datetime)
+                queryset = queryset.filter(created_at__lte=end_datetime)
             except ValueError:
                 pass  # Invalid date format, ignore filter
         
@@ -274,8 +274,8 @@ class RideEventViewSet(viewsets.ModelViewSet):
         twenty_four_hours_ago = datetime.now(timezone.utc) - timedelta(hours=24)
         
         todays_events = self.get_queryset().filter(
-            event_time__gte=twenty_four_hours_ago
-        ).order_by('-event_time')
+            created_at__gte=twenty_four_hours_ago
+        ).order_by('-created_at')
         
         # Apply pagination for performance
         page = self.paginate_queryset(todays_events)
@@ -306,18 +306,18 @@ class RideEventViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        events = self.get_queryset().filter(id_ride=ride).order_by('event_time')
+        events = self.get_queryset().filter(id_ride=ride).order_by('created_at')
         serializer = RideEventSerializer(events, many=True)
         return Response(serializer.data)
     
     @action(detail=False, methods=['get'])
     def event_types(self, request):
         """
-        Get all unique event types in the system.
+        Get all unique event types (descriptions) in the system.
         """
         event_types = RideEvent.objects.values_list(
-            'event_type', flat=True
-        ).distinct().order_by('event_type')
+            'description', flat=True
+        ).distinct().order_by('description')
         
         return Response({
             'event_types': list(event_types),
@@ -335,16 +335,16 @@ class RideEventViewSet(viewsets.ModelViewSet):
         
         # Events from last 24 hours
         twenty_four_hours_ago = datetime.now(timezone.utc) - timedelta(hours=24)
-        todays_events = RideEvent.objects.filter(event_time__gte=twenty_four_hours_ago).count()
+        todays_events = RideEvent.objects.filter(created_at__gte=twenty_four_hours_ago).count()
         
         # Events from last 7 days
         seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
-        weekly_events = RideEvent.objects.filter(event_time__gte=seven_days_ago).count()
+        weekly_events = RideEvent.objects.filter(created_at__gte=seven_days_ago).count()
         
         # Most common event types
         from django.db.models import Count
-        common_event_types = RideEvent.objects.values('event_type').annotate(
-            count=Count('event_type')
+        common_event_types = RideEvent.objects.values('description').annotate(
+            count=Count('description')
         ).order_by('-count')[:5]
         
         return Response({
@@ -362,7 +362,7 @@ class RideViewSet(viewsets.ModelViewSet):
     Only accessible by admin users as per specification.
     """
     
-    queryset = Ride.objects.select_related('id_rider', 'id_driver').prefetch_related('rideevent_set').all()
+    queryset = Ride.objects.select_related('id_rider', 'id_driver').prefetch_related('ride_events').all()
     permission_classes = [IsAuthenticated, IsAdminUser]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     
@@ -372,8 +372,8 @@ class RideViewSet(viewsets.ModelViewSet):
         'id_rider__first_name', 'id_rider__last_name', 'id_rider__email',
         'id_driver__first_name', 'id_driver__last_name', 'id_driver__email'
     ]
-    ordering_fields = ['id_ride', 'pickup_time', 'status', 'created_at']
-    ordering = ['-created_at']  # Default ordering
+    ordering_fields = ['id_ride', 'pickup_time', 'status']
+    ordering = ['-pickup_time']  # Default ordering
     
     def get_serializer_class(self):
         """
@@ -411,7 +411,7 @@ class RideViewSet(viewsets.ModelViewSet):
         queryset = Ride.objects.select_related(
             'id_rider', 
             'id_driver'
-        ).prefetch_related('rideevent_set').all()
+        ).prefetch_related('ride_events').all()
         
         # Filter by status if specified
         status_filter = self.request.query_params.get('status', None)
@@ -562,7 +562,7 @@ class RideViewSet(viewsets.ModelViewSet):
         ride = self.get_object()
         
         # Get all events
-        all_events = ride.rideevent_set.all().order_by('event_time')
+        all_events = ride.ride_events.all().order_by('created_at')
         
         # Get today's events
         todays_events = ride.get_todays_ride_events()
@@ -602,11 +602,11 @@ class RideViewSet(viewsets.ModelViewSet):
         
         # Recent rides (last 7 days)
         seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
-        recent_rides = Ride.objects.filter(created_at__gte=seven_days_ago).count()
+        recent_rides = Ride.objects.filter(pickup_time__gte=seven_days_ago).count()
         
         # Today's rides
         today = datetime.now(timezone.utc).date()
-        todays_rides = Ride.objects.filter(created_at__date=today).count()
+        todays_rides = Ride.objects.filter(pickup_time__date=today).count()
         
         return Response({
             'total_rides': total_rides,
