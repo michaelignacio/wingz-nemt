@@ -16,8 +16,12 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from rides.home_views import home
 
 urlpatterns = [
+    path('', home, name='home'),  # Home page with API navigation
     path('admin/', admin.site.urls),
     path('api/', include('rides.urls')),
+    # Add DRF browsable API authentication
+    path('api-auth/', include('rest_framework.urls')),
 ]
