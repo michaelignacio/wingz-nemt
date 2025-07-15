@@ -353,3 +353,264 @@ class RideEventViewSet(viewsets.ModelViewSet):
             'weekly_events': weekly_events,
             'most_common_event_types': list(common_event_types),
         })
+
+
+class RideViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for Ride model with complex operations.
+    Includes GPS sorting, performance optimizations, and the special todays_ride_events field.
+    Only accessible by admin users as per specification.
+    """
+    
+    queryset = Ride.objects.select_related('id_rider', 'id_driver').prefetch_related('rideevent_set').all()
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    
+    # Filtering options
+    filterset_fields = ['status', 'id_rider', 'id_driver']
+    search_fields = [
+        'id_rider__first_name', 'id_rider__last_name', 'id_rider__email',
+        'id_driver__first_name', 'id_driver__last_name', 'id_driver__email'
+    ]
+    ordering_fields = ['id_ride', 'pickup_time', 'status', 'created_at']
+    ordering = ['-created_at']  # Default ordering
+    
+    def get_serializer_class(self):
+        """
+        Return appropriate serializer based on action.
+        """
+        if self.action == 'create':
+            return RideCreateSerializer
+        elif self.action == 'list':
+            return RideListSerializer
+        return RideSerializer
+    
+    def get_serializer_context(self):
+        """
+        Add GPS coordinates to serializer context for distance calculations.
+        """
+        context = super().get_serializer_context()
+        
+        # Add GPS coordinates from request parameters for distance calculations
+        gps_lat = self.request.query_params.get('gps_latitude')
+        gps_lng = self.request.query_params.get('gps_longitude')
+        
+        if gps_lat and gps_lng:
+            try:
+                context['request'].gps_latitude = float(gps_lat)
+                context['request'].gps_longitude = float(gps_lng)
+            except (ValueError, TypeError):
+                pass  # Invalid GPS coordinates, ignore
+        
+        return context
+    
+    def get_queryset(self):
+        """
+        Optimized queryset with GPS sorting and filtering options.
+        """
+        queryset = Ride.objects.select_related(
+            'id_rider', 
+            'id_driver'
+        ).prefetch_related('rideevent_set').all()
+        
+        # Filter by status if specified
+        status_filter = self.request.query_params.get('status', None)
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        
+        # Filter by rider if specified
+        rider_id = self.request.query_params.get('rider_id', None)
+        if rider_id:
+            queryset = queryset.filter(id_rider=rider_id)
+        
+        # Filter by driver if specified
+        driver_id = self.request.query_params.get('driver_id', None)
+        if driver_id:
+            queryset = queryset.filter(id_driver=driver_id)
+        
+        # Filter by date range if specified
+        start_date = self.request.query_params.get('start_date', None)
+        end_date = self.request.query_params.get('end_date', None)
+        
+        if start_date:
+            try:
+                from datetime import datetime
+                start_datetime = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+                queryset = queryset.filter(pickup_time__gte=start_datetime)
+            except ValueError:
+                pass
+        
+        if end_date:
+            try:
+                from datetime import datetime
+                end_datetime = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                queryset = queryset.filter(pickup_time__lte=end_datetime)
+            except ValueError:
+                pass
+        
+        # GPS sorting if coordinates provided
+        gps_lat = self.request.query_params.get('gps_latitude')
+        gps_lng = self.request.query_params.get('gps_longitude')
+        
+        if gps_lat and gps_lng:
+            try:
+                lat = float(gps_lat)
+                lng = float(gps_lng)
+                
+                # Add distance annotation for sorting
+                from django.db.models import Case, When, FloatField
+                from django.db.models.functions import Sqrt, Power
+                
+                # Calculate distance using Haversine approximation
+                queryset = queryset.extra(
+                    select={
+                        'distance': '''
+                            6371 * acos(
+                                cos(radians(%s)) * cos(radians(pickup_latitude)) *
+                                cos(radians(pickup_longitude) - radians(%s)) +
+                                sin(radians(%s)) * sin(radians(pickup_latitude))
+                            )
+                        '''
+                    },
+                    select_params=[lat, lng, lat]
+                ).order_by('distance')
+                
+            except (ValueError, TypeError):
+                pass  # Invalid GPS coordinates, ignore sorting
+        
+        return queryset
+    
+    def create(self, request, *args, **kwargs):
+        """
+        Create a new ride with proper validation.
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        ride = serializer.save()
+        
+        # Return full ride data using RideSerializer
+        response_serializer = RideSerializer(ride, context=self.get_serializer_context())
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+    
+    def update(self, request, *args, **kwargs):
+        """
+        Update ride with partial update support.
+        """
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        ride = serializer.save()
+        
+        return Response(RideSerializer(ride, context=self.get_serializer_context()).data)
+    
+    @action(detail=False, methods=['get'])
+    def nearby(self, request):
+        """
+        Get rides near a specific GPS location.
+        Requires gps_latitude, gps_longitude, and radius (in km) parameters.
+        """
+        gps_lat = request.query_params.get('gps_latitude')
+        gps_lng = request.query_params.get('gps_longitude')
+        radius = request.query_params.get('radius', 10)  # Default 10km radius
+        
+        if not gps_lat or not gps_lng:
+            return Response(
+                {'error': 'gps_latitude and gps_longitude parameters are required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            lat = float(gps_lat)
+            lng = float(gps_lng)
+            radius_km = float(radius)
+        except (ValueError, TypeError):
+            return Response(
+                {'error': 'Invalid GPS coordinates or radius'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Find rides within radius using Haversine formula
+        nearby_rides = self.get_queryset().extra(
+            select={
+                'distance': '''
+                    6371 * acos(
+                        cos(radians(%s)) * cos(radians(pickup_latitude)) *
+                        cos(radians(pickup_longitude) - radians(%s)) +
+                        sin(radians(%s)) * sin(radians(pickup_latitude))
+                    )
+                '''
+            },
+            select_params=[lat, lng, lat],
+            where=['6371 * acos(cos(radians(%s)) * cos(radians(pickup_latitude)) * cos(radians(pickup_longitude) - radians(%s)) + sin(radians(%s)) * sin(radians(pickup_latitude))) <= %s'],
+            params=[lat, lng, lat, radius_km]
+        ).order_by('distance')
+        
+        serializer = RideListSerializer(nearby_rides, many=True, context=self.get_serializer_context())
+        return Response({
+            'rides': serializer.data,
+            'center_point': {'latitude': lat, 'longitude': lng},
+            'radius_km': radius_km,
+            'count': nearby_rides.count()
+        })
+    
+    @action(detail=True, methods=['get'])
+    def events(self, request, pk=None):
+        """
+        Get all events for a specific ride with today's events highlighted.
+        """
+        ride = self.get_object()
+        
+        # Get all events
+        all_events = ride.rideevent_set.all().order_by('event_time')
+        
+        # Get today's events
+        todays_events = ride.get_todays_ride_events()
+        
+        return Response({
+            'ride_id': ride.id_ride,
+            'all_events': RideEventSerializer(all_events, many=True).data,
+            'todays_events': TodaysRideEventSerializer(todays_events, many=True).data,
+            'todays_events_count': todays_events.count(),
+            'total_events_count': all_events.count(),
+        })
+    
+    @action(detail=False, methods=['get'])
+    def active(self, request):
+        """
+        Get all active rides (not completed or cancelled).
+        """
+        active_rides = self.get_queryset().exclude(status__in=['completed', 'cancelled'])
+        serializer = RideListSerializer(active_rides, many=True, context=self.get_serializer_context())
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """
+        Get ride statistics with breakdown by status.
+        """
+        from django.db.models import Count
+        from datetime import datetime, timezone, timedelta
+        
+        # Overall stats
+        total_rides = Ride.objects.count()
+        
+        # Status breakdown
+        status_stats = Ride.objects.values('status').annotate(
+            count=Count('status')
+        ).order_by('status')
+        
+        # Recent rides (last 7 days)
+        seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
+        recent_rides = Ride.objects.filter(created_at__gte=seven_days_ago).count()
+        
+        # Today's rides
+        today = datetime.now(timezone.utc).date()
+        todays_rides = Ride.objects.filter(created_at__date=today).count()
+        
+        return Response({
+            'total_rides': total_rides,
+            'todays_rides': todays_rides,
+            'recent_rides': recent_rides,
+            'status_breakdown': list(status_stats),
+        })
