@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from .models import User, Ride
+from .models import User, Ride, RideEvent
 
 
 class UserAdmin(BaseUserAdmin):
@@ -29,6 +29,39 @@ class UserAdmin(BaseUserAdmin):
     readonly_fields = ('date_joined', 'last_login')
 
 
+class RideEventInline(admin.TabularInline):
+    """Inline admin for RideEvent within Ride admin."""
+    model = RideEvent
+    extra = 0
+    readonly_fields = ('created_at',)
+    fields = ('description', 'created_at')
+
+
+class RideEventAdmin(admin.ModelAdmin):
+    """Admin configuration for the RideEvent model."""
+    
+    list_display = ('id_ride_event', 'id_ride', 'description', 'created_at')
+    list_filter = ('created_at', 'id_ride__status')
+    search_fields = ('description', 'id_ride__id_ride')
+    ordering = ('-created_at',)
+    date_hierarchy = 'created_at'
+    
+    fieldsets = (
+        ('Event Information', {
+            'fields': ('id_ride', 'description')
+        }),
+        ('Timestamp', {
+            'fields': ('created_at',)
+        }),
+    )
+    
+    readonly_fields = ('created_at',)
+    
+    def get_queryset(self, request):
+        """Optimize queryset with select_related for better performance."""
+        return super().get_queryset(request).select_related('id_ride')
+
+
 class RideAdmin(admin.ModelAdmin):
     """Admin configuration for the Ride model."""
     
@@ -37,6 +70,7 @@ class RideAdmin(admin.ModelAdmin):
     search_fields = ('id_rider__email', 'id_driver__email', 'id_rider__first_name', 'id_rider__last_name')
     ordering = ('-pickup_time',)
     date_hierarchy = 'pickup_time'
+    inlines = [RideEventInline]
     
     fieldsets = (
         ('Ride Information', {
@@ -58,6 +92,7 @@ class RideAdmin(admin.ModelAdmin):
     )
     
     readonly_fields = ('created_at', 'updated_at')
+    inlines = [RideEventInline]
     
     def get_queryset(self, request):
         """Optimize queryset with select_related for better performance."""
@@ -66,3 +101,4 @@ class RideAdmin(admin.ModelAdmin):
 
 admin.site.register(User, UserAdmin)
 admin.site.register(Ride, RideAdmin)
+admin.site.register(RideEvent, RideEventAdmin)

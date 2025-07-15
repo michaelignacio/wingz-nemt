@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.utils import timezone
+from datetime import timedelta
 
 
 class CustomUserManager(BaseUserManager):
@@ -173,3 +175,80 @@ class Ride(models.Model):
         r = 6371
         
         return c * r
+
+    def get_todays_ride_events(self):
+        """
+        Get ride events from the last 24 hours for this ride.
+        This is the optimized field mentioned in the specification.
+        """
+        twenty_four_hours_ago = timezone.now() - timedelta(hours=24)
+        return self.ride_events.filter(created_at__gte=twenty_four_hours_ago)
+
+
+class RideEventManager(models.Manager):
+    """Custom manager for RideEvent with optimized queries."""
+    
+    def todays_events(self):
+        """Return events from the last 24 hours for performance optimization."""
+        twenty_four_hours_ago = timezone.now() - timedelta(hours=24)
+        return self.filter(created_at__gte=twenty_four_hours_ago)
+    
+    def for_ride(self, ride_id):
+        """Get all events for a specific ride."""
+        return self.filter(id_ride_id=ride_id)
+
+
+class RideEvent(models.Model):
+    """
+    RideEvent model based on the specification.
+    Represents events that occur during a ride (pickup, dropoff, etc.).
+    """
+    
+    id_ride_event = models.AutoField(primary_key=True, help_text="Primary key")
+    id_ride = models.ForeignKey(
+        Ride,
+        on_delete=models.CASCADE,
+        related_name='ride_events',
+        help_text="Foreign key referencing Ride(id_ride)"
+    )
+    description = models.CharField(
+        max_length=255,
+        help_text="Description of the ride event"
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text="Timestamp of when the event occurred"
+    )
+    
+    objects = RideEventManager()
+    
+    class Meta:
+        db_table = 'ride_event'
+        verbose_name = 'Ride Event'
+        verbose_name_plural = 'Ride Events'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['id_ride']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['id_ride', 'created_at']),  # Compound index for performance
+        ]
+    
+    def __str__(self):
+        return f"Event {self.id_ride_event}: {self.description} (Ride {self.id_ride_id})"
+    
+    @classmethod
+    def create_status_change_event(cls, ride, new_status):
+        """
+        Create a standardized status change event.
+        This follows the specification format for pickup/dropoff events.
+        """
+        description = f"Status changed to {new_status}"
+        return cls.objects.create(id_ride=ride, description=description)
+    
+    def is_pickup_event(self):
+        """Check if this is a pickup event."""
+        return 'pickup' in self.description.lower()
+    
+    def is_dropoff_event(self):
+        """Check if this is a dropoff event."""
+        return 'dropoff' in self.description.lower()
