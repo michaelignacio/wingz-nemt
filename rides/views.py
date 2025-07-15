@@ -167,3 +167,189 @@ class UserViewSet(viewsets.ModelViewSet):
             'admins': admins,
             'inactive_users': total_users - active_users,
         })
+
+
+class RideEventViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for RideEvent model with CRUD operations.
+    Includes performance optimizations for large datasets.
+    Only accessible by admin users as per specification.
+    """
+    
+    queryset = RideEvent.objects.select_related('id_ride', 'id_ride__id_rider', 'id_ride__id_driver').all()
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    
+    # Filtering options
+    filterset_fields = ['event_type', 'id_ride', 'id_ride__status']
+    search_fields = ['event_type', 'id_ride__id_rider__email', 'id_ride__id_driver__email']
+    ordering_fields = ['id_ride_event', 'event_time', 'event_type', 'created_at']
+    ordering = ['-event_time']  # Default ordering by most recent events
+    
+    def get_serializer_class(self):
+        """
+        Return appropriate serializer based on action.
+        """
+        if self.action == 'create':
+            return RideEventCreateSerializer
+        elif self.action == 'todays_events':
+            return TodaysRideEventSerializer
+        return RideEventSerializer
+    
+    def get_queryset(self):
+        """
+        Optimized queryset with filtering options.
+        """
+        queryset = RideEvent.objects.select_related(
+            'id_ride', 
+            'id_ride__id_rider', 
+            'id_ride__id_driver'
+        ).all()
+        
+        # Filter by ride ID if specified
+        ride_id = self.request.query_params.get('ride_id', None)
+        if ride_id:
+            queryset = queryset.filter(id_ride=ride_id)
+        
+        # Filter by event type if specified
+        event_type = self.request.query_params.get('event_type', None)
+        if event_type:
+            queryset = queryset.filter(event_type__icontains=event_type)
+        
+        # Filter by date range if specified
+        start_date = self.request.query_params.get('start_date', None)
+        end_date = self.request.query_params.get('end_date', None)
+        
+        if start_date:
+            try:
+                from datetime import datetime
+                start_datetime = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+                queryset = queryset.filter(event_time__gte=start_datetime)
+            except ValueError:
+                pass  # Invalid date format, ignore filter
+        
+        if end_date:
+            try:
+                from datetime import datetime
+                end_datetime = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                queryset = queryset.filter(event_time__lte=end_datetime)
+            except ValueError:
+                pass  # Invalid date format, ignore filter
+        
+        return queryset
+    
+    def create(self, request, *args, **kwargs):
+        """
+        Create a new ride event with proper validation.
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        ride_event = serializer.save()
+        
+        # Return full ride event data using RideEventSerializer
+        response_serializer = RideEventSerializer(ride_event)
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+    
+    def update(self, request, *args, **kwargs):
+        """
+        Update ride event with partial update support.
+        """
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        ride_event = serializer.save()
+        
+        return Response(RideEventSerializer(ride_event).data)
+    
+    @action(detail=False, methods=['get'])
+    def todays_events(self, request):
+        """
+        Get all ride events from today with performance optimization.
+        This is the optimized endpoint mentioned in the specification.
+        """
+        from datetime import datetime, timezone, timedelta
+        
+        # Get events from the last 24 hours
+        twenty_four_hours_ago = datetime.now(timezone.utc) - timedelta(hours=24)
+        
+        todays_events = self.get_queryset().filter(
+            event_time__gte=twenty_four_hours_ago
+        ).order_by('-event_time')
+        
+        # Apply pagination for performance
+        page = self.paginate_queryset(todays_events)
+        if page is not None:
+            serializer = TodaysRideEventSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        
+        serializer = TodaysRideEventSerializer(todays_events, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def by_ride(self, request):
+        """
+        Get all events for a specific ride.
+        """
+        ride_id = request.query_params.get('ride_id')
+        if not ride_id:
+            return Response(
+                {'error': 'ride_id parameter is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            ride = Ride.objects.get(id_ride=ride_id)
+        except Ride.DoesNotExist:
+            return Response(
+                {'error': 'Ride not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        events = self.get_queryset().filter(id_ride=ride).order_by('event_time')
+        serializer = RideEventSerializer(events, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def event_types(self, request):
+        """
+        Get all unique event types in the system.
+        """
+        event_types = RideEvent.objects.values_list(
+            'event_type', flat=True
+        ).distinct().order_by('event_type')
+        
+        return Response({
+            'event_types': list(event_types),
+            'count': len(event_types)
+        })
+    
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """
+        Get ride event statistics.
+        """
+        from datetime import datetime, timezone, timedelta
+        
+        total_events = RideEvent.objects.count()
+        
+        # Events from last 24 hours
+        twenty_four_hours_ago = datetime.now(timezone.utc) - timedelta(hours=24)
+        todays_events = RideEvent.objects.filter(event_time__gte=twenty_four_hours_ago).count()
+        
+        # Events from last 7 days
+        seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
+        weekly_events = RideEvent.objects.filter(event_time__gte=seven_days_ago).count()
+        
+        # Most common event types
+        from django.db.models import Count
+        common_event_types = RideEvent.objects.values('event_type').annotate(
+            count=Count('event_type')
+        ).order_by('-count')[:5]
+        
+        return Response({
+            'total_events': total_events,
+            'todays_events': todays_events,
+            'weekly_events': weekly_events,
+            'most_common_event_types': list(common_event_types),
+        })
