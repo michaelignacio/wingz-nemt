@@ -95,6 +95,100 @@ The API provides admin-only access to ride management with the following feature
 
 All endpoints require admin authentication. Only users with 'admin' role can access the API.
 
+**Get Token:**
+```bash
+POST /api/api/auth/token/
+Content-Type: application/json
+
+{
+    "username": "admin@example.com",
+    "password": "your_password"
+}
+```
+
+**Use Token in Headers:**
+```bash
+Authorization: Token your_token_here
+```
+
+### API Endpoints
+
+#### User Management
+- `GET /api/api/users/` - List all users (with filtering, search, pagination)
+- `POST /api/api/users/` - Create new user
+- `GET /api/api/users/{id}/` - Get specific user details
+- `PUT /api/api/users/{id}/` - Update user (full update)
+- `PATCH /api/api/users/{id}/` - Partial update user
+- `DELETE /api/api/users/{id}/` - Deactivate user (soft delete)
+- `POST /api/api/users/{id}/activate/` - Reactivate deactivated user
+- `GET /api/api/users/drivers/` - Get all active drivers
+- `GET /api/api/users/riders/` - Get all active riders
+- `GET /api/api/users/{id}/rides/` - Get all rides for specific user
+- `GET /api/api/users/stats/` - Get user statistics dashboard
+
+#### Ride Management
+- `GET /api/api/rides/` - List rides (supports GPS sorting, filtering, pagination)
+- `POST /api/api/rides/` - Create new ride
+- `GET /api/api/rides/{id}/` - Get specific ride with events
+- `PUT /api/api/rides/{id}/` - Update ride (full update)
+- `PATCH /api/api/rides/{id}/` - Partial update ride
+- `DELETE /api/api/rides/{id}/` - Delete ride
+- `GET /api/api/rides/nearby/` - Find rides near GPS coordinates
+- `GET /api/api/rides/{id}/events/` - Get all events for specific ride
+- `GET /api/api/rides/active/` - Get all active (non-completed) rides
+- `GET /api/api/rides/stats/` - Get ride statistics dashboard
+
+#### Ride Event Management
+- `GET /api/api/ride-events/` - List ride events (with filtering, search, pagination)
+- `POST /api/api/ride-events/` - Create new ride event
+- `GET /api/api/ride-events/{id}/` - Get specific ride event
+- `PUT /api/api/ride-events/{id}/` - Update ride event (full update)
+- `PATCH /api/api/ride-events/{id}/` - Partial update ride event
+- `DELETE /api/api/ride-events/{id}/` - Delete ride event
+- `GET /api/api/ride-events/todays_events/` - Get today's events (performance optimized)
+- `GET /api/api/ride-events/by_ride/?ride_id={id}` - Get events for specific ride
+- `GET /api/api/ride-events/event_types/` - Get all unique event types
+- `GET /api/api/ride-events/stats/` - Get ride event statistics
+
+### Special Features
+
+#### GPS-Based Sorting
+Add GPS parameters to ride list to sort by distance:
+```bash
+GET /api/api/rides/?gps_latitude=37.7749&gps_longitude=-122.4194
+```
+
+#### Nearby Rides
+Find rides within a radius (default 10km):
+```bash
+GET /api/api/rides/nearby/?gps_latitude=37.7749&gps_longitude=-122.4194&radius=5
+```
+
+#### Today's Events (Performance Optimized)
+Get events from last 24 hours with pagination:
+```bash
+GET /api/api/ride-events/todays_events/
+```
+
+#### Filtering Examples
+```bash
+# Filter users by role
+GET /api/api/users/?role=driver&is_active=true
+
+# Filter rides by status and date
+GET /api/api/rides/?status=active&start_date=2025-01-01
+
+# Search users by name or email
+GET /api/api/users/?search=john
+
+# Filter events by type and ride
+GET /api/api/ride-events/?event_type=pickup&ride_id=123
+```
+
+### Interactive API Browser
+
+Visit `/api/api/` in your browser after starting the server to access Django REST Framework's interactive API browser for testing endpoints.
+
 ## Development
 
 This project follows Django best practices and includes:
