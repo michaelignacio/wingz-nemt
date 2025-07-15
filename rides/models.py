@@ -80,3 +80,96 @@ class User(AbstractBaseUser, PermissionsMixin):
     def is_admin(self):
         """Check if user has admin role."""
         return self.role == 'admin'
+
+
+class Ride(models.Model):
+    """
+    Ride model based on the specification.
+    Represents a ride with pickup/dropoff locations and associated users.
+    """
+    
+    STATUS_CHOICES = [
+        ('en-route', 'En Route'),
+        ('pickup', 'Pickup'),
+        ('dropoff', 'Dropoff'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    ]
+    
+    id_ride = models.AutoField(primary_key=True, help_text="Primary key")
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='en-route',
+        help_text="Ride status (e.g., 'en-route', 'pickup', 'dropoff')"
+    )
+    id_rider = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='rides_as_rider',
+        help_text="Foreign key referencing User(id_user) - the rider"
+    )
+    id_driver = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='rides_as_driver',
+        help_text="Foreign key referencing User(id_user) - the driver"
+    )
+    pickup_latitude = models.FloatField(help_text="Latitude of pickup location")
+    pickup_longitude = models.FloatField(help_text="Longitude of pickup location")
+    dropoff_latitude = models.FloatField(help_text="Latitude of dropoff location")
+    dropoff_longitude = models.FloatField(help_text="Longitude of dropoff location")
+    pickup_time = models.DateTimeField(help_text="Pickup time")
+    
+    # Additional fields for better functionality
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'ride'
+        verbose_name = 'Ride'
+        verbose_name_plural = 'Rides'
+        ordering = ['-pickup_time']
+        indexes = [
+            models.Index(fields=['status']),
+            models.Index(fields=['pickup_time']),
+            models.Index(fields=['id_rider']),
+            models.Index(fields=['id_driver']),
+            models.Index(fields=['pickup_latitude', 'pickup_longitude']),
+        ]
+    
+    def __str__(self):
+        return f"Ride {self.id_ride} - {self.status} ({self.id_rider.email} -> {self.id_driver.email})"
+    
+    @property
+    def pickup_location(self):
+        """Return pickup coordinates as a tuple."""
+        return (self.pickup_latitude, self.pickup_longitude)
+    
+    @property
+    def dropoff_location(self):
+        """Return dropoff coordinates as a tuple."""
+        return (self.dropoff_latitude, self.dropoff_longitude)
+    
+    def distance_from_point(self, latitude, longitude):
+        """
+        Calculate distance from a given point to the pickup location.
+        Uses Haversine formula for GPS distance calculation.
+        Returns distance in kilometers.
+        """
+        import math
+        
+        # Convert latitude and longitude from degrees to radians
+        lat1, lon1 = math.radians(latitude), math.radians(longitude)
+        lat2, lon2 = math.radians(self.pickup_latitude), math.radians(self.pickup_longitude)
+        
+        # Haversine formula
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+        c = 2 * math.asin(math.sqrt(a))
+        
+        # Radius of earth in kilometers
+        r = 6371
+        
+        return c * r
