@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework.authtoken',  # For token authentication
     'django_filters',
     'rides',
 ]
@@ -132,20 +133,73 @@ AUTH_USER_MODEL = 'rides.User'
 
 # Django REST Framework Configuration
 REST_FRAMEWORK = {
+    # Authentication Classes
     'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
         'rest_framework.authentication.SessionAuthentication',
-        'rest_framework.authentication.BasicAuthentication',
     ],
+    
+    # Permission Classes - Admin-only access as per specification
     'DEFAULT_PERMISSION_CLASSES': [
-        'rides.permissions.IsAdminUser',  # Only admin users can access the API
+        'rides.permissions.IsAdminUser',
     ],
+    
+    # Pagination for performance with large datasets
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20,
+    'PAGE_SIZE': 25,  # Optimized page size for performance
+    
+    # Filtering and Ordering
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
         'rest_framework.filters.OrderingFilter',
     ],
+    
+    # Response Renderers
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',  # For interactive API browser
     ],
+    
+    # Response Parsers
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.FormParser',
+        'rest_framework.parsers.MultiPartParser',
+    ],
+    
+    # Performance Settings - Rate Limiting
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle'
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/hour',  # Anonymous users (not used since admin-only, but good practice)
+        'user': '1000/hour'  # Authenticated users
+    },
+    
+    # Test Request Factory
+    'TEST_REQUEST_DEFAULT_FORMAT': 'json',
+}
+
+# Pagination Settings for Large Datasets
+REST_FRAMEWORK_PAGINATION = {
+    'PAGE_SIZE_QUERY_PARAM': 'page_size',
+    'MAX_PAGE_SIZE': 100,  # Maximum records per page to prevent performance issues
+}
+
+# Additional Performance Settings
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB max upload size
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB max file upload size
+
+# Cache Settings for Performance (optional - can be configured later)
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+        'TIMEOUT': 300,  # 5 minutes default timeout
+        'OPTIONS': {
+            'MAX_ENTRIES': 1000,
+        }
+    }
 }
