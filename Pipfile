@@ -1,0 +1,16 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+django = "==4.2.7"
+djangorestframework = "==3.14.0"
+django-filter = "==23.3"
+psycopg = {extras = ["binary"], version = "*"}
+python-decouple = "==3.8"
+
+[dev-packages]
+
+[requires]
+python_version = "3.13"
