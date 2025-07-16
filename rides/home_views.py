@@ -38,13 +38,20 @@ def home(request):
             <div class="api-section">
                 <h3>📚 API Endpoints</h3>
                 <div class="api-links">
-                    <a href="/api/api/">🏠 API Root - Start Here</a>
-                    <a href="/api/api/users/">👥 Users Management</a>
-                    <a href="/api/api/users/stats/">📊 User Statistics</a>
-                    <a href="/api/api/rides/">🚗 Rides Management</a>
-                    <a href="/api/api/rides/stats/">📈 Ride Statistics</a>
-                    <a href="/api/api/ride-events/">📝 Ride Events</a>
-                    <a href="/api/api/ride-events/stats/">📋 Event Statistics</a>
+                    <a href="/api/">🏠 API Root - Start Here</a>
+                    <a href="/api/users/">👥 Users Management</a>
+                    <a href="/api/users/stats/">📊 User Statistics</a>
+                    <a href="/api/rides/">🚗 Rides Management</a>
+                    <a href="/api/rides/stats/">📈 Ride Statistics</a>
+                    <a href="/api/ride-events/">📝 Ride Events</a>
+                    <a href="/api/ride-events/stats/">📋 Event Statistics</a>
+                    <a href="/api/rides/?gps_latitude=37.7749&amp;gps_longitude=-122.4194" target="_blank">✨ GPS-Based Sorting Example</a>
+                    <a href="/api/rides/nearby/?gps_latitude=37.7749&amp;gps_longitude=-122.4194&amp;radius=5" target="_blank">✨ Nearby Rides Example</a>
+                    <a href="/api/ride-events/todays_events/" target="_blank">✨ Today's Events Example</a>
+                    <a href="/api/users/?role=driver&amp;is_active=true" target="_blank">✨ Filter Users by Role</a>
+                    <a href="/api/rides/?status=active&amp;start_date=2025-01-01" target="_blank">✨ Filter Rides by Status and Date</a>
+                    <a href="/api/users/?search=john" target="_blank">✨ Search Users by Name or Email</a>
+                    <a href="/api/ride-events/?event_type=pickup&amp;ride_id=123" target="_blank">✨ Filter Events by Type and Ride</a>
                 </div>
             </div>
 
@@ -59,8 +66,8 @@ def home(request):
                 </ul>
             </div>
 
-            <div class="api-section">
-                <h3>🔧 Features</h3>
+            <div class="api-section" id="special-features">
+                <h3>🔧 Special Features</h3>
                 <ul>
                     <li>✅ Complete User Management</li>
                     <li>✅ Ride Tracking & GPS Sorting</li>

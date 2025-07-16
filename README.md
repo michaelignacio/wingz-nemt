@@ -83,7 +83,40 @@ python manage.py runserver
 - `DATABASE_URL`: PostgreSQL connection string
 
 ## API Documentation
+## Special Features
 
+### [GPS-Based Sorting](#gps-based-sorting)
+Add GPS parameters to ride list to sort by distance:
+```bash
+GET /api/rides/?gps_latitude=37.7749&gps_longitude=-122.4194
+```
+
+### [Nearby Rides](#nearby-rides)
+Find rides within a radius (default 10km):
+```bash
+GET /api/rides/nearby/?gps_latitude=37.7749&gps_longitude=-122.4194&radius=5
+```
+
+### [Today's Events (Performance Optimized)](#todays-events-performance-optimized)
+Get events from last 24 hours with pagination:
+```bash
+GET /api/ride-events/todays_events/
+```
+
+### [Filtering Examples](#filtering-examples)
+```bash
+# Filter users by role
+GET /api/users/?role=driver&is_active=true
+
+# Filter rides by status and date
+GET /api/rides/?status=active&start_date=2025-01-01
+
+# Search users by name or email
+GET /api/users/?search=john
+
+# Filter events by type and ride
+GET /api/ride-events/?event_type=pickup&ride_id=123
+```
 The API provides admin-only access to ride management with the following features:
 
 - Ride List API with pagination, filtering, and sorting
