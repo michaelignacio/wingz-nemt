@@ -79,11 +79,19 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
-9. Create test users:
+
+
+9. Create test users (admin and test accounts):
 ```bash
 python manage.py create_test_users --create-admin --create-test-users
 ```
 This will create the admin and test accounts described in this README for local development and testing.
+
+10. Populate test data (users, rides, and ride events):
+```bash
+python manage.py populate_test_data
+```
+This will create additional dispatcher, test users, rides, and ride events for local development and testing.
 
 
 ## Environment Variables
