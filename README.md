@@ -1,6 +1,9 @@
+
 # Wingz NEMT - Django REST API
 
 A RESTful API for managing ride information using Django REST Framework.
+
+![Wingz Homepage](assets/wingz-homepage.jpg)
 
 ## Prerequisites
 
@@ -82,6 +85,7 @@ python manage.py create_test_users --create-admin --create-test-users
 ```
 This will create the admin and test accounts described in this README for local development and testing.
 
+
 ## Environment Variables
 
 - `DEBUG`: Set to `True` for development, `False` for production
@@ -89,6 +93,9 @@ This will create the admin and test accounts described in this README for local 
 - `DATABASE_URL`: PostgreSQL connection string
 
 ## API Documentation
+
+![Wingz API Screenshot](assets/wingz-api-screenshot.jpg)
+
 ## Special Features
 
 ### [GPS-Based Sorting](#gps-based-sorting)
