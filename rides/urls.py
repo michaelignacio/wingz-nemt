@@ -12,13 +12,14 @@ router.register(r'users', views.UserViewSet, basename='user')
 router.register(r'rides', views.RideViewSet, basename='ride')
 router.register(r'ride-events', views.RideEventViewSet, basename='rideevent')
 
+
 urlpatterns = [
     # RESTful API endpoints via router
-    path('api/', include(router.urls)),
-    
+    path('', include(router.urls)),
+
     # Authentication
-    path('api/auth/token/', obtain_auth_token, name='api_token_auth'),
-    
+    path('auth/token/', obtain_auth_token, name='api_token_auth'),
+
     # Legacy test endpoints (backward compatibility)
     path('test-admin/', auth_views.test_admin_access, name='test_admin_access'),
     path('check-role/', auth_views.check_user_role, name='check_user_role'),
