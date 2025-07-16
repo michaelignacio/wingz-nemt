@@ -76,6 +76,12 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
+9. Create test users:
+```bash
+python manage.py create_test_users --create-admin --create-test-users
+```
+This will create the admin and test accounts described in this README for local development and testing.
+
 ## Environment Variables
 
 - `DEBUG`: Set to `True` for development, `False` for production
