@@ -97,7 +97,6 @@ This will create additional dispatcher, test users, rides, and ride events for l
 ## Environment Variables
 
 - `DEBUG`: Set to `True` for development, `False` for production
-- `SECRET_KEY`: Django secret key (generate a new one for production)
 - `DATABASE_URL`: PostgreSQL connection string
 
 ## API Documentation
