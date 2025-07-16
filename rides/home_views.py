@@ -45,13 +45,13 @@ def home(request):
                     <a href="/api/rides/stats/">📈 Ride Statistics</a>
                     <a href="/api/ride-events/">📝 Ride Events</a>
                     <a href="/api/ride-events/stats/">📋 Event Statistics</a>
-                    <a href="/api/rides/?gps_latitude=37.7749&amp;gps_longitude=-122.4194" target="_blank">✨ GPS-Based Sorting Example</a>
-                    <a href="/api/rides/nearby/?gps_latitude=37.7749&amp;gps_longitude=-122.4194&amp;radius=5" target="_blank">✨ Nearby Rides Example</a>
-                    <a href="/api/ride-events/todays_events/" target="_blank">✨ Today's Events Example</a>
-                    <a href="/api/users/?role=driver&amp;is_active=true" target="_blank">✨ Filter Users by Role</a>
-                    <a href="/api/rides/?status=active&amp;start_date=2025-01-01" target="_blank">✨ Filter Rides by Status and Date</a>
-                    <a href="/api/users/?search=john" target="_blank">✨ Search Users by Name or Email</a>
-                    <a href="/api/ride-events/?event_type=pickup&amp;ride_id=123" target="_blank">✨ Filter Events by Type and Ride</a>
+                    <a href="/api/rides/?gps_latitude=37.7749&amp;gps_longitude=-122.4194">✨ GPS-Based Sorting Example</a>
+                    <a href="/api/rides/nearby/?gps_latitude=37.7749&amp;gps_longitude=-122.4194&amp;radius=5">✨ Nearby Rides Example</a>
+                    <a href="/api/ride-events/todays_events/">✨ Today's Events Example</a>
+                    <a href="/api/users/?role=driver&amp;is_active=true">✨ Filter Users by Role</a>
+                    <a href="/api/rides/?status=active&amp;start_date=2025-01-01">✨ Filter Rides by Status and Date</a>
+                    <a href="/api/users/?search=john">✨ Search Users by Name or Email</a>
+                    <a href="/api/ride-events/?event_type=pickup&amp;ride_id=123">✨ Filter Events by Type and Ride</a>
                 </div>
             </div>
 
