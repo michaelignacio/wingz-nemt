@@ -1,3 +1,5 @@
+# Redirect users to homepage after login
+LOGIN_REDIRECT_URL = "/"
 """
 Django settings for wingz_nemt project.
 
